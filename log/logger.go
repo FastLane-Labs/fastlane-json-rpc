@@ -1,53 +1,44 @@
 package log
 
 import (
-	"log/slog"
-	"os"
+	"context"
 
+	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	gethlog "github.com/ethereum/go-ethereum/log"
 )
 
-type LogConfig struct {
-	Level string `mapstructure:"level"`
-}
-
-func InitLogger(cfg *LogConfig) {
-	var slogLevel slog.Level
-
-	switch cfg.Level {
-	case "debug":
-		slogLevel = slog.LevelDebug
-	case "info":
-		slogLevel = slog.LevelInfo
-	case "warn":
-		slogLevel = slog.LevelWarn
-	case "error":
-		slogLevel = slog.LevelError
-	default:
-		slogLevel = slog.LevelInfo
+func Debug(ctx context.Context, format string, v ...interface{}) {
+	traceId := ctx.Value(rpcContext.TraceIdLabel)
+	if traceId != nil {
+		v = append(v, rpcContext.TraceIdLabel, traceId)
 	}
 
-	gethlog.SetDefault(gethlog.NewLogger(gethlog.NewTerminalHandlerWithLevel(os.Stdout, slogLevel, true)))
-
-	Info("logger initialized", "level", cfg.Level)
-}
-
-func With(ctx ...interface{}) gethlog.Logger {
-	return gethlog.Root().With(ctx...)
-}
-
-func Debug(format string, v ...interface{}) {
 	gethlog.Debug(format, v...)
 }
 
-func Info(format string, v ...interface{}) {
+func Info(ctx context.Context, format string, v ...interface{}) {
+	traceId := ctx.Value(rpcContext.TraceIdLabel)
+	if traceId != nil {
+		v = append(v, rpcContext.TraceIdLabel, traceId)
+	}
+
 	gethlog.Info(format, v...)
 }
 
-func Warn(format string, v ...interface{}) {
+func Warn(ctx context.Context, format string, v ...interface{}) {
+	traceId := ctx.Value(rpcContext.TraceIdLabel)
+	if traceId != nil {
+		v = append(v, rpcContext.TraceIdLabel, traceId)
+	}
+
 	gethlog.Warn(format, v...)
 }
 
-func Error(format string, v ...interface{}) {
+func Error(ctx context.Context, format string, v ...interface{}) {
+	traceId := ctx.Value(rpcContext.TraceIdLabel)
+	if traceId != nil {
+		v = append(v, rpcContext.TraceIdLabel, traceId)
+	}
+
 	gethlog.Error(format, v...)
 }

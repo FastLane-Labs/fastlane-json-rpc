@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -50,7 +51,7 @@ func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, register
 func (s *Server) Close() {
 	close(s.shutdownChan)
 	s.wg.Wait()
-	log.Info("RPC server stopped")
+	log.Info(context.Background(), "RPC server stopped")
 }
 
 func startRpcServer(port uint64, routes []HttpRoute) error {
@@ -82,9 +83,9 @@ func startRpcServer(port uint64, routes []HttpRoute) error {
 	}
 
 	go func() {
-		log.Info("RPC server started", "addr", httpServer.Addr)
+		log.Info(context.Background(), "RPC server started", "addr", httpServer.Addr)
 		err := httpServer.Serve(ln)
-		log.Info("RPC server stopped", "err", err)
+		log.Info(context.Background(), "RPC server stopped", "err", err)
 	}()
 
 	return nil

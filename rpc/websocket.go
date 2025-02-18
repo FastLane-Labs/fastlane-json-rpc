@@ -1,13 +1,16 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"runtime/debug"
 	"time"
 
 	"github.com/FastLane-Labs/fastlane-json-rpc/log"
+	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/rpc/jsonrpc"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -35,7 +38,7 @@ func (c *Conn) send(msg *jsonrpc.JsonRpcResponse) {
 	c.sendChan <- msg.Marshal()
 }
 
-func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) websocketHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -47,7 +50,7 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Error("failed upgrading connection", "err", err)
+		log.Error(ctx, "failed upgrading connection", "err", err)
 		return
 	}
 
@@ -88,17 +91,19 @@ func (s *Server) websocketReadLoop(conn *Conn, doneChan chan struct{}) {
 				websocket.CloseAbnormalClosure,
 				websocket.CloseNoStatusReceived,
 			) {
-				log.Error("websocketReadLoop: unexpected close error", "ip", conn.IP, "err", err)
+				log.Error(context.Background(), "websocketReadLoop: unexpected close error", "ip", conn.IP, "err", err)
 			}
 			return
 		}
 
 		// Handle the request in a separate goroutine
 		go func() {
+			ctx := rpcContext.NewContextWithTraceId(context.Background(), uuid.New().String())
+
 			defer func() {
 				if r := recover(); r != nil {
 					conn.send(jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InternalError, "internal error", nil, nil))
-					log.Error("websocket server execution error", "error", r, "stack", string(debug.Stack()))
+					log.Error(ctx, "websocket server execution error", "error", r, "stack", string(debug.Stack()))
 				}
 			}()
 
@@ -115,7 +120,7 @@ func (s *Server) websocketReadLoop(conn *Conn, doneChan chan struct{}) {
 				return
 			}
 
-			conn.send(s.handleJsonRpcRequest(&request, ""))
+			conn.send(s.handleJsonRpcRequest(ctx, &request))
 		}()
 	}
 }
@@ -129,7 +134,7 @@ func (s *Server) websocketWriteLoop(conn *Conn, doneChan <-chan struct{}) {
 		case <-s.shutdownChan:
 			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Server closing connection")
 			if err := conn.WriteMessage(websocket.CloseMessage, closeMsg); err != nil {
-				log.Error("websocketWriteLoop: failed to write close message", "ip", conn.IP, "err", err)
+				log.Error(context.Background(), "websocketWriteLoop: failed to write close message", "ip", conn.IP, "err", err)
 			}
 			return
 
@@ -139,7 +144,7 @@ func (s *Server) websocketWriteLoop(conn *Conn, doneChan <-chan struct{}) {
 		case <-ticker.C:
 			deadline := time.Now().Add(writeWait)
 			if err := conn.WriteControl(websocket.PingMessage, []byte{}, deadline); err != nil {
-				log.Error("websocketWriteLoop: failed to write ping message", "ip", conn.IP, "err", err)
+				log.Error(context.Background(), "websocketWriteLoop: failed to write ping message", "ip", conn.IP, "err", err)
 				return
 			}
 
@@ -148,7 +153,7 @@ func (s *Server) websocketWriteLoop(conn *Conn, doneChan <-chan struct{}) {
 			conn.SetWriteDeadline(deadline)
 
 			if err := conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Error("websocketWriteLoop: failed to write message", "ip", conn.IP, "err", err)
+				log.Error(context.Background(), "websocketWriteLoop: failed to write message", "ip", conn.IP, "err", err)
 				return
 			}
 		}

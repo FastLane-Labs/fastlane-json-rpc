@@ -8,21 +8,20 @@ import (
 	"time"
 
 	"github.com/FastLane-Labs/fastlane-json-rpc/log"
-	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/rpc/jsonrpc"
-	"github.com/google/uuid"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
 
 const (
+	runtimeMethod      = "RuntimeMethod"
 	optionalTypePrefix = "optional_"
 )
 
-func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId string) *jsonrpc.JsonRpcResponse {
+func (s *Server) handleJsonRpcRequest(ctx context.Context, request *jsonrpc.JsonRpcRequest) *jsonrpc.JsonRpcResponse {
 	var (
 		start    = time.Now()
-		response = s._handleJsonRpcRequest(request, traceId)
+		response = s._handleJsonRpcRequest(ctx, request)
 		duration = time.Since(start)
 	)
 
@@ -31,13 +30,13 @@ func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId s
 			s.metrics.RequestDuration.WithLabelValues(request.Method).Observe(duration.Seconds())
 		}
 
-		log.Info(fmt.Sprintf("served %s", request.Method), "duration", duration)
+		log.Info(ctx, fmt.Sprintf("served %s", request.Method), "duration", duration)
 	} else {
 		if s.metrics.enabled {
 			s.metrics.RequestErrors.Inc()
 		}
 
-		log.Warn(fmt.Sprintf("served %s", request.Method), "duration", duration, "error", response.Error.Error())
+		log.Warn(ctx, fmt.Sprintf("served %s", request.Method), "duration", duration, "error", response.Error.Error())
 	}
 
 	if s.metrics.enabled {
@@ -47,9 +46,14 @@ func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId s
 	return response
 }
 
-func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId string) *jsonrpc.JsonRpcResponse {
+func (s *Server) _handleJsonRpcRequest(ctx context.Context, request *jsonrpc.JsonRpcRequest) *jsonrpc.JsonRpcResponse {
 	if err := request.Validate(); err != nil {
 		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidRequest, "invalid request", err.Error(), request.Id)
+	}
+
+	// Check if method name is reserved
+	if request.Method == runtimeMethod {
+		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.MethodNotFound, "method not found: runtimeMethod is reserved", nil, request.Id)
 	}
 
 	call := reflect.ValueOf(s.api).MethodByName(cases.Title(language.Und, cases.NoLower).String(request.Method))
@@ -86,10 +90,6 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId 
 	if hasContextParam {
 		// Insert context as first argument and shift other args
 		args = make([]reflect.Value, numParams+1)
-		if traceId == "" {
-			traceId = uuid.New().String()
-		}
-		ctx := rpcContext.NewContextWithTraceId(context.Background(), traceId)
 		args[paramStartIdx] = reflect.ValueOf(ctx)
 		paramStartIdx++
 	}

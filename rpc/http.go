@@ -1,11 +1,13 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/rpc/jsonrpc"
+	"github.com/google/uuid"
 )
 
 type HttpRoute struct {
@@ -42,13 +44,20 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
+	traceId := r.Header.Get(string(rpcContext.TraceIdLabel))
+	if traceId == "" {
+		traceId = uuid.New().String()
+	}
+
+	ctx := rpcContext.NewContextWithTraceId(context.Background(), traceId)
+
 	if r.Header.Get("Upgrade") == "websocket" {
 		if !s.cfg.Websocket.Enabled {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 
-		s.websocketHandler(w, r)
+		s.websocketHandler(ctx, w, r)
 		return
 	}
 
@@ -68,8 +77,7 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := s.handleJsonRpcRequest(&request, r.Header.Get(string(rpcContext.TraceIdLabel)))
-
+	response := s.handleJsonRpcRequest(ctx, &request)
 	if !response.IsSuccess() {
 		w.WriteHeader(http.StatusBadRequest)
 	}
