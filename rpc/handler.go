@@ -191,7 +191,6 @@ func isOptionalParamUndefined(numParams, numIn int, hasOptional bool) bool {
 	return hasOptional && numParams == numIn-1
 }
 
-// Add these helper functions:
 func isNumericType(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
