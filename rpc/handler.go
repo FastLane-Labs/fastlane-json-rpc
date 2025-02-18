@@ -1,13 +1,16 @@
 package rpc
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/FastLane-Labs/fastlane-json-rpc/log"
+	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/rpc/jsonrpc"
+	"github.com/google/uuid"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -16,10 +19,10 @@ const (
 	optionalTypePrefix = "optional_"
 )
 
-func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc.JsonRpcResponse {
+func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId string) *jsonrpc.JsonRpcResponse {
 	var (
 		start    = time.Now()
-		response = s._handleJsonRpcRequest(request)
+		response = s._handleJsonRpcRequest(request, traceId)
 		duration = time.Since(start)
 	)
 
@@ -44,7 +47,7 @@ func (s *Server) handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc.
 	return response
 }
 
-func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc.JsonRpcResponse {
+func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest, traceId string) *jsonrpc.JsonRpcResponse {
 	if err := request.Validate(); err != nil {
 		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidRequest, "invalid request", err.Error(), request.Id)
 	}
@@ -61,6 +64,12 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 	numParams := len(request.Params)
 	hasOptional := hasOptionalInput(numIn, &call)
 
+	// Check if first parameter is context.Context
+	hasContextParam := numIn > 0 && call.Type().In(0).String() == "context.Context"
+	if hasContextParam {
+		numIn-- // Adjust numIn since context will be handled separately
+	}
+
 	if !hasValidParamLength(numParams, numIn, hasOptional) {
 		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params count", nil, request.Id)
 	}
@@ -70,23 +79,37 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 		numParams++
 	}
 
+	// Create args slice with room for context if needed
 	args := make([]reflect.Value, numParams)
+	paramStartIdx := 0
+
+	if hasContextParam {
+		// Insert context as first argument and shift other args
+		args = make([]reflect.Value, numParams+1)
+		if traceId == "" {
+			traceId = uuid.New().String()
+		}
+		ctx := rpcContext.NewContextWithTraceId(context.Background(), traceId)
+		args[paramStartIdx] = reflect.ValueOf(ctx)
+		paramStartIdx++
+	}
 
 	for i, arg := range request.Params {
-		switch call.Type().In(i).Kind() {
+		paramIndex := i + paramStartIdx
+		switch call.Type().In(paramIndex).Kind() {
 		case reflect.Float32:
 			val, ok := arg.(float32)
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Float64:
 			val, ok := arg.(float64)
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Int:
 			val, ok := arg.(int)
@@ -98,9 +121,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Int8:
 			val, ok := arg.(int8)
@@ -112,9 +135,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Int16:
 			val, ok := arg.(int16)
@@ -126,9 +149,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Int32:
 			val, ok := arg.(int32)
@@ -140,9 +163,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Int64:
 			val, ok := arg.(int64)
@@ -154,33 +177,33 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Interface:
-			args[i] = reflect.ValueOf(arg)
+			args[paramIndex] = reflect.ValueOf(arg)
 
 		case reflect.Map:
 			val, ok := arg.(map[string]any)
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Slice:
 			val, ok := arg.([]interface{})
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.String:
 			val, ok := arg.(string)
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Uint:
 			val, ok := arg.(uint)
@@ -192,9 +215,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Uint8:
 			val, ok := arg.(uint8)
@@ -206,9 +229,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Uint16:
 			val, ok := arg.(uint16)
@@ -220,9 +243,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Uint32:
 			val, ok := arg.(uint32)
@@ -234,9 +257,9 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Uint64:
 			val, ok := arg.(uint64)
@@ -248,16 +271,16 @@ func (s *Server) _handleJsonRpcRequest(request *jsonrpc.JsonRpcRequest) *jsonrpc
 				}
 			}
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		case reflect.Bool:
 			val, ok := arg.(bool)
 			if !ok {
-				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(i, &call), request.Id)
+				return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidParams, "invalid params", formatConversionErrMsg(paramIndex, &call), request.Id)
 			}
-			args[i] = reflect.ValueOf(val)
+			args[paramIndex] = reflect.ValueOf(val)
 
 		default:
 			return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InternalError, "internal error", "Invalid method definition", request.Id)
