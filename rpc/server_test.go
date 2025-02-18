@@ -23,7 +23,7 @@ func TestServer_HttpRequest(t *testing.T) {
 
 	api := testutils.NewMockRpcAdapter()
 
-	s, err := NewServer(testCfg, false, api)
+	s, err := NewServer(testCfg, api, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -68,9 +68,9 @@ func TestServer_HttpRequest(t *testing.T) {
 			expectedErrorPart: "mock_methodA error",
 		},
 		{
-			methodCalled:      "mock_runtime_method",
-			methodParams:      []interface{}{60, false},
-			expectedHttpCode:  http.StatusOK,
+			methodCalled:     "mock_runtime_method",
+			methodParams:     []interface{}{60, false},
+			expectedHttpCode: http.StatusOK,
 			expectedResult:   "mock_runtime_method success",
 		},
 		{
@@ -142,7 +142,7 @@ func TestServer_WebsocketRequest(t *testing.T) {
 
 	api := testutils.NewMockRpcAdapter()
 
-	s, err := NewServer(testCfg, false, api)
+	s, err := NewServer(testCfg, api, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
 	}

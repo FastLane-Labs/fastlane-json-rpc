@@ -20,7 +20,9 @@ type RpcMetrics struct {
 	RequestDuration *prometheus.HistogramVec
 }
 
-func NewRpcMetrics(reg prometheus.Registerer, enabled bool) *RpcMetrics {
+func NewRpcMetrics(reg prometheus.Registerer) *RpcMetrics {
+	enabled := reg != nil
+
 	m := &RpcMetrics{enabled: enabled}
 
 	if !enabled {

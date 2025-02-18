@@ -35,7 +35,7 @@ func (c *Conn) send(msg *jsonrpc.JsonRpcResponse) {
 	c.sendChan <- msg.Marshal()
 }
 
-func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
@@ -48,7 +48,7 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) error 
 	c, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Error("failed upgrading connection", "err", err)
-		return err
+		return
 	}
 
 	conn := NewConn(c)
@@ -60,8 +60,6 @@ func (s *Server) websocketHandler(w http.ResponseWriter, r *http.Request) error 
 	if s.metrics.enabled {
 		s.metrics.WebsocketConnections.Inc()
 	}
-
-	return nil
 }
 
 func (s *Server) websocketReadLoop(conn *Conn, doneChan chan struct{}) {
