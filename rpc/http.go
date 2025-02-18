@@ -11,7 +11,7 @@ type HttpRoute struct {
 	Name        string
 	Method      string
 	Pattern     string
-	HandlerFunc func(http.ResponseWriter, *http.Request) error
+	HandlerFunc http.HandlerFunc
 }
 
 func (s *Server) buildHttpRoutes() []HttpRoute {
@@ -32,27 +32,28 @@ func (s *Server) buildHttpRoutes() []HttpRoute {
 			"HTTP",
 			http.MethodGet,
 			s.cfg.HealthcheckEndpoint,
-			s.healthcheck,
+			http.HandlerFunc(s.hcCallback),
 		},
 	}
 }
 
-func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
 
 	if r.Header.Get("Upgrade") == "websocket" {
 		if !s.cfg.Websocket.Enabled {
 			w.WriteHeader(http.StatusNotFound)
-			return nil
+			return
 		}
 
-		return s.websocketHandler(w, r)
+		s.websocketHandler(w, r)
+		return
 	}
 
 	if !s.cfg.HTTP.Enabled {
 		w.WriteHeader(http.StatusNotFound)
-		return nil
+		return
 	}
 
 	if s.metrics.enabled {
@@ -63,7 +64,7 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) error {
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write(jsonrpc.NewJsonRpcErrorResponse(jsonrpc.ParseError, "invalid request", err.Error(), nil).Marshal())
-		return err
+		return
 	}
 
 	response := s.handleJsonRpcRequest(&request)
@@ -73,13 +74,4 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	w.Write(response.Marshal())
-
-	return nil
-}
-
-func (s *Server) healthcheck(w http.ResponseWriter, r *http.Request) error {
-	// Placeholder for healthcheck logic
-
-	w.WriteHeader(http.StatusOK)
-	return nil
 }

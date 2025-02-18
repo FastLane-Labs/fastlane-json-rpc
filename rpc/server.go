@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	"github.com/FastLane-Labs/fastlane-json-rpc/log"
 	"github.com/gorilla/handlers"
@@ -13,32 +12,39 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type HealthcheckCallback func(w http.ResponseWriter, r *http.Request)
+
 type Server struct {
 	cfg     *RpcConfig
 	metrics *RpcMetrics
 	api     Api
 
+	hcCallback HealthcheckCallback
+
 	shutdownChan chan struct{}
 	wg           sync.WaitGroup
 }
 
-func NewServer(cfg *RpcConfig, enabledMetrics bool, api Api) (*Server, error) {
+func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, registerer prometheus.Registerer) (*Server, error) {
+	if hcCallback == nil {
+		hcCallback = func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}
+	}
+
 	s := &Server{
 		cfg:          cfg,
-		metrics:      NewRpcMetrics(prometheus.DefaultRegisterer, enabledMetrics),
+		metrics:      NewRpcMetrics(registerer),
 		api:          api,
+		hcCallback:   hcCallback,
 		shutdownChan: make(chan struct{}),
 	}
 
-	if err := s.start(); err != nil {
+	if err := startRpcServer(s.cfg.Port, s.buildHttpRoutes()); err != nil {
 		return nil, err
 	}
 
 	return s, nil
-}
-
-func (s *Server) start() error {
-	return startRpcServer(s.cfg.Port, s.buildHttpRoutes())
 }
 
 func (s *Server) Close() {
@@ -49,17 +55,15 @@ func (s *Server) Close() {
 
 func startRpcServer(port uint64, routes []HttpRoute) error {
 	router := mux.NewRouter().StrictSlash(true)
-	logger := func(inner func(http.ResponseWriter, *http.Request) error, name string) http.Handler {
+	logger := func(inner func(http.ResponseWriter, *http.Request)) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			err := inner(w, r)
-			log.Debug(fmt.Sprintf("served %s", name), "method", r.Method, "url", r.RequestURI, "duration", time.Since(start), "error", err)
+			inner(w, r)
 		})
 	}
 
 	for _, route := range routes {
-		var handler http.Handler = logger(route.HandlerFunc, route.Name)
+		var handler http.Handler = logger(route.HandlerFunc)
 		router.
 			Methods(route.Method).
 			Path(route.Pattern).
