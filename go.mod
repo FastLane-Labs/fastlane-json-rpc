@@ -2,7 +2,10 @@ module github.com/FastLane-Labs/fastlane-json-rpc
 
 go 1.22.0
 
-require golang.org/x/text v0.22.0
+require (
+	github.com/google/uuid v1.3.0
+	golang.org/x/text v0.22.0
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect

@@ -85,6 +85,12 @@ func TestServer_HttpRequest(t *testing.T) {
 			expectedHttpCode:  http.StatusBadRequest,
 			expectedErrorPart: "method not found",
 		},
+		{
+			methodCalled:     "mock_methodWithContext",
+			methodParams:     []interface{}{6.9},
+			expectedHttpCode: http.StatusOK,
+			expectedResult:   true,
+		},
 	}
 
 	for _, tc := range tt {
@@ -106,7 +112,7 @@ func TestServer_HttpRequest(t *testing.T) {
 		}
 		defer resp.Body.Close()
 
-		assert.Equal(t, tc.expectedHttpCode, resp.StatusCode)
+		assert.Equal(t, tc.expectedHttpCode, resp.StatusCode, tc.methodCalled)
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {

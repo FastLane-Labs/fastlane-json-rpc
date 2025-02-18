@@ -1,9 +1,11 @@
 package testutils
 
 import (
+	"context"
 	"errors"
 	"reflect"
 
+	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
 
@@ -54,4 +56,12 @@ func (r *MockRpcAdapter) Mock_runtime_method(param1 float64, shouldError bool) (
 		return "", errors.New("mock_runtime_method error")
 	}
 	return "mock_runtime_method success", nil
+}
+
+func (r *MockRpcAdapter) Mock_methodWithContext(ctx context.Context, param1 float64) (bool, error) {
+	if ctx.Value(rpcContext.TraceIdLabel) == nil {
+		return false, errors.New("traceId is nil")
+	}
+
+	return true, nil
 }

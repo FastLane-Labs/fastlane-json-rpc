@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	rpcContext "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/rpc/jsonrpc"
 )
 
@@ -67,7 +68,7 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := s.handleJsonRpcRequest(&request)
+	response := s.handleJsonRpcRequest(&request, r.Header.Get(string(rpcContext.TraceIdLabel)))
 
 	if !response.IsSuccess() {
 		w.WriteHeader(http.StatusBadRequest)

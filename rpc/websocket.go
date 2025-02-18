@@ -115,7 +115,7 @@ func (s *Server) websocketReadLoop(conn *Conn, doneChan chan struct{}) {
 				return
 			}
 
-			conn.send(s.handleJsonRpcRequest(&request))
+			conn.send(s.handleJsonRpcRequest(&request, ""))
 		}()
 	}
 }
