@@ -10,7 +10,7 @@ import (
 func Debug(ctx context.Context, format string, v ...interface{}) {
 	traceId := ctx.Value(rpcContext.TraceIdLabel)
 	if traceId != nil {
-		v = append(v, rpcContext.TraceIdLabel, traceId)
+		v = append(v, string(rpcContext.TraceIdLabel), traceId)
 	}
 
 	gethlog.Debug(format, v...)
@@ -19,7 +19,7 @@ func Debug(ctx context.Context, format string, v ...interface{}) {
 func Info(ctx context.Context, format string, v ...interface{}) {
 	traceId := ctx.Value(rpcContext.TraceIdLabel)
 	if traceId != nil {
-		v = append(v, rpcContext.TraceIdLabel, traceId)
+		v = append(v, string(rpcContext.TraceIdLabel), traceId)
 	}
 
 	gethlog.Info(format, v...)
@@ -28,7 +28,7 @@ func Info(ctx context.Context, format string, v ...interface{}) {
 func Warn(ctx context.Context, format string, v ...interface{}) {
 	traceId := ctx.Value(rpcContext.TraceIdLabel)
 	if traceId != nil {
-		v = append(v, rpcContext.TraceIdLabel, traceId)
+		v = append(v, string(rpcContext.TraceIdLabel), traceId)
 	}
 
 	gethlog.Warn(format, v...)
@@ -37,7 +37,7 @@ func Warn(ctx context.Context, format string, v ...interface{}) {
 func Error(ctx context.Context, format string, v ...interface{}) {
 	traceId := ctx.Value(rpcContext.TraceIdLabel)
 	if traceId != nil {
-		v = append(v, rpcContext.TraceIdLabel, traceId)
+		v = append(v, string(rpcContext.TraceIdLabel), traceId)
 	}
 
 	gethlog.Error(format, v...)
