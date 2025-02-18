@@ -65,3 +65,11 @@ func (r *MockRpcAdapter) Mock_methodWithContext(ctx context.Context, param1 floa
 
 	return true, nil
 }
+
+func (r *MockRpcAdapter) Mock_methodWithContextAndArg(ctx context.Context, param1 string) (*struct{ Mock string }, error) {
+	if ctx.Value(rpcContext.TraceIdLabel) == nil {
+		return nil, errors.New("traceId is nil")
+	}
+
+	return &struct{ Mock string }{Mock: param1}, nil
+}

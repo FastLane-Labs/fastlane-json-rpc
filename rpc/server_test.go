@@ -2,11 +2,13 @@ package rpc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"testing"
 
+	ctx "github.com/FastLane-Labs/fastlane-json-rpc/rpc/context"
 	"github.com/FastLane-Labs/fastlane-json-rpc/testutils"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/assert"
@@ -90,6 +92,12 @@ func TestServer_HttpRequest(t *testing.T) {
 			methodParams:     []interface{}{6.9},
 			expectedHttpCode: http.StatusOK,
 			expectedResult:   true,
+		},
+		{
+			methodCalled:     "mock_methodWithContextAndArg",
+			methodParams:     []interface{}{ctx.NewContextWithTraceId(context.Background(), "mockTraceId"), "mockArg"},
+			expectedHttpCode: http.StatusOK,
+			expectedResult:   &struct{ Mock string }{Mock: "mockArg"},
 		},
 	}
 
