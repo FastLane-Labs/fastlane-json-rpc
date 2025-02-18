@@ -3,11 +3,14 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/FastLane-Labs/fastlane-json-rpc/log"
+	gethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -27,6 +30,8 @@ type Server struct {
 }
 
 func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, registerer prometheus.Registerer) (*Server, error) {
+	gethlog.SetDefault(gethlog.NewLogger(gethlog.NewTerminalHandlerWithLevel(os.Stdout, slog.LevelDebug, true)))
+
 	if hcCallback == nil {
 		hcCallback = func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
