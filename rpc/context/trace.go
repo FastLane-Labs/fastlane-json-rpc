@@ -2,10 +2,11 @@ package context
 
 import (
 	_context "context"
+	"net/http"
 )
 
-const (
-	TraceIdLabel = TraceIdContextKey("TraceId")
+var (
+	TraceIdLabel = TraceIdContextKey(http.CanonicalHeaderKey("traceId"))
 )
 
 type TraceIdContextKey string
