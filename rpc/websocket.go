@@ -42,6 +42,10 @@ func (c *Conn) send(msg *jsonrpc.JsonRpcResponse) {
 	c.sendChan <- msg.Marshal()
 }
 
+func (c *Conn) SendRaw(data []byte) {
+	c.sendChan <- data
+}
+
 func (s *Server) websocketHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	s.wg.Add(1)
 	defer s.wg.Done()
