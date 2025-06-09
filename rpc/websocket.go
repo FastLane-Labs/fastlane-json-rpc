@@ -14,14 +14,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type connContextKeyType string
+type ConnContextKeyType string
 
 const (
 	pongWait   = 60 * time.Second
 	pingPeriod = (60 * time.Second * 9) / 10
 	writeWait  = 2 * time.Second
 
-	connContextKey = connContextKeyType("ws-conn")
+	connContextKey = ConnContextKeyType("ws-conn")
 )
 
 type Conn struct {
