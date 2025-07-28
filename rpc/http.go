@@ -77,10 +77,5 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := s.handleJsonRpcRequest(ctx, &request)
-	if !response.IsSuccess() {
-		w.WriteHeader(http.StatusBadRequest)
-	}
-
-	w.Write(response.Marshal())
+	w.Write(s.handleJsonRpcRequest(ctx, &request).Marshal())
 }

@@ -40,19 +40,19 @@ func TestServer_HttpRequest(t *testing.T) {
 		{
 			methodCalled:      "invalid_method",
 			methodParams:      []interface{}{60, false},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "method not found",
 		},
 		{
 			methodCalled:      "mock_methodA",
 			methodParams:      []interface{}{60, false, 500},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "invalid params count",
 		},
 		{
 			methodCalled:      "mock_methodA",
 			methodParams:      []interface{}{"60", false},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "invalid params",
 		},
 		{
@@ -64,7 +64,7 @@ func TestServer_HttpRequest(t *testing.T) {
 		{
 			methodCalled:      "mock_methodA",
 			methodParams:      []interface{}{60, true},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "mock_methodA error",
 		},
 		{
@@ -76,13 +76,13 @@ func TestServer_HttpRequest(t *testing.T) {
 		{
 			methodCalled:      "mock_runtime_method",
 			methodParams:      []interface{}{60, true},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "mock_runtime_method error",
 		},
 		{
 			methodCalled:      "mock_runtime_method_unknown",
 			methodParams:      []interface{}{60, false},
-			expectedHttpCode:  http.StatusBadRequest,
+			expectedHttpCode:  http.StatusOK,
 			expectedErrorPart: "method not found",
 		},
 		{
