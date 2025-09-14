@@ -14,10 +14,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type ConnContextKeyType string
+
 const (
 	pongWait   = 60 * time.Second
 	pingPeriod = (60 * time.Second * 9) / 10
 	writeWait  = 2 * time.Second
+
+	ConnContextKey = ConnContextKeyType("ws-conn")
 )
 
 type Conn struct {
@@ -36,6 +40,10 @@ func NewConn(conn *websocket.Conn) *Conn {
 
 func (c *Conn) send(msg *jsonrpc.JsonRpcResponse) {
 	c.sendChan <- msg.Marshal()
+}
+
+func (c *Conn) SendRaw(data []byte) {
+	c.sendChan <- data
 }
 
 func (s *Server) websocketHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -99,6 +107,7 @@ func (s *Server) websocketReadLoop(conn *Conn, doneChan chan struct{}) {
 		// Handle the request in a separate goroutine
 		go func() {
 			ctx := rpcContext.NewContextWithTraceId(context.Background(), uuid.New().String())
+			ctx = context.WithValue(ctx, ConnContextKey, conn)
 
 			defer func() {
 				if r := recover(); r != nil {
