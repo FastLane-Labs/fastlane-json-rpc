@@ -18,18 +18,22 @@ import (
 
 type HealthcheckCallback func(w http.ResponseWriter, r *http.Request)
 
+// Middleware is a function that wraps an http.Handler
+type Middleware func(http.Handler) http.Handler
+
 type Server struct {
 	cfg     *RpcConfig
 	metrics *RpcMetrics
 	api     Api
 
-	hcCallback HealthcheckCallback
+	hcCallback  HealthcheckCallback
+	middlewares []Middleware
 
 	shutdownChan chan struct{}
 	wg           sync.WaitGroup
 }
 
-func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, registerer prometheus.Registerer) (*Server, error) {
+func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, registerer prometheus.Registerer, middlewares ...Middleware) (*Server, error) {
 	gethlog.SetDefault(gethlog.NewLogger(gethlog.NewTerminalHandlerWithLevel(os.Stdout, slog.LevelDebug, true)))
 
 	if hcCallback == nil {
@@ -43,10 +47,11 @@ func NewServer(cfg *RpcConfig, api Api, hcCallback HealthcheckCallback, register
 		metrics:      NewRpcMetrics(registerer),
 		api:          api,
 		hcCallback:   hcCallback,
+		middlewares:  middlewares,
 		shutdownChan: make(chan struct{}),
 	}
 
-	if err := startRpcServer(s.cfg.Port, s.buildHttpRoutes()); err != nil {
+	if err := startRpcServer(s.cfg.Port, s.buildHttpRoutes(), s.middlewares); err != nil {
 		return nil, err
 	}
 
@@ -59,7 +64,7 @@ func (s *Server) Close() {
 	log.Info(context.Background(), "RPC server stopped")
 }
 
-func startRpcServer(port uint64, routes []HttpRoute) error {
+func startRpcServer(port uint64, routes []HttpRoute, middlewares []Middleware) error {
 	router := mux.NewRouter().StrictSlash(true)
 	logger := func(inner func(http.ResponseWriter, *http.Request)) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -77,9 +82,15 @@ func startRpcServer(port uint64, routes []HttpRoute) error {
 			Handler(handler)
 	}
 
+	// Apply custom middlewares in reverse order so they execute in the order they were provided
+	var finalHandler http.Handler = router
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		finalHandler = middlewares[i](finalHandler)
+	}
+
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
-		Handler: handlers.CORS(handlers.AllowedHeaders([]string{"Content-Type"}))(router),
+		Handler: handlers.CORS(handlers.AllowedHeaders([]string{"Content-Type"}))(finalHandler),
 	}
 
 	ln, err := net.Listen("tcp", httpServer.Addr)
