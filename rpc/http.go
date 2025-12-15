@@ -1,7 +1,6 @@
 package rpc
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 
@@ -49,7 +48,8 @@ func (s *Server) httpHandler(w http.ResponseWriter, r *http.Request) {
 		traceId = uuid.New().String()
 	}
 
-	ctx := rpcContext.NewContextWithTraceId(context.Background(), traceId)
+	// Use r.Context() to preserve any values set by middleware (e.g., client IP, JWT tokens)
+	ctx := rpcContext.NewContextWithTraceId(r.Context(), traceId)
 
 	if r.Header.Get("Upgrade") == "websocket" {
 		if !s.cfg.Websocket.Enabled {
