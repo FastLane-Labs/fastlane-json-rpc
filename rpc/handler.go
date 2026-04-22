@@ -149,7 +149,11 @@ func (s *Server) _handleJsonRpcRequest(ctx context.Context, request *jsonrpc.Jso
 
 	if err, ok := value[len(value)-1].Interface().(error); ok && err != nil {
 		// Errored
-		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidRequest, err.Error(), nil, request.Id)
+		var data interface{}
+		if de, ok := err.(DataError); ok {
+			data = de.ErrorData()
+		}
+		return jsonrpc.NewJsonRpcErrorResponse(jsonrpc.InvalidRequest, err.Error(), data, request.Id)
 	}
 
 	if len(value) > 2 {
